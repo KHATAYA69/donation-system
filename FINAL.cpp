@@ -64,6 +64,40 @@ void write_file_user(const string file, User user) {
     infile.close();
 }
 
+bool charityExists(const string& file, const string& charityName) {
+    ifstream infile(file);
+    string line;
+
+    while (getline(infile, line)) {
+        stringstream ss(line);
+        int charityID;
+        string name, description;
+        double targetAmount, currentAmount;
+        Date deadline;
+        string status;
+
+        // Read each field
+        ss >> charityID;
+        ss >> ws;  // Skip any whitespace before reading the name
+        getline(ss, name, ' ');  // Extract name, assuming space as a delimiter
+        getline(ss, description, ' '); // Extract description
+        ss >> targetAmount >> currentAmount;
+        ss >> deadline.day >> deadline.month >> deadline.year;
+        getline(ss, status);
+
+        // Compare the name
+        if (name == charityName) {
+            infile.close();
+            return true;  // Found a matching charity name
+        }
+    }
+
+    infile.close();
+    return false;  // Charity doesn't exist
+}
+
+
+
 void write_file_charity(const string file, Charity charity) {
     fstream myfile(file, ios::in | ios::out | ios::app);
     int lastID = 0;
@@ -203,11 +237,18 @@ void SignIn() {
 }
 
 
+
 void AddCharity() {
     Charity charity;
 
     cout << "Enter charity name: ";
     cin >> charity.name;
+
+    if (charityExists("charities.txt", charity.name)) {
+        cout << "This charity already exists in the file!" << endl;
+        return;  //stop the function if charity exists
+    }
+
 
     cin.ignore();
 
@@ -230,6 +271,152 @@ void AddCharity() {
     getline(cin, charity.status);
 
     write_file_charity("charities.txt", charity);
+}
+
+void removeCharityByName(const string& file, const string& charityName) {
+    ifstream infile(file);  // Open the file for reading
+    ofstream tempFile("temp.txt");  // Temporary file to store the updated content
+
+    string line;
+    bool found = false;
+
+
+    while (getline(infile, line)) {
+        stringstream ss(line);
+        int charityID;
+        string name, description;
+        double targetAmount, currentAmount;
+        Date deadline;
+        string status;
+
+        // Read each field from the line
+        ss >> charityID;
+        ss >> ws;  // Skip any whitespace before reading the name
+        getline(ss, name, ' ');  // Extract name, assuming space as a delimiter
+        getline(ss, description, ' ');  // Extract description
+        ss >> targetAmount >> currentAmount;
+        ss >> deadline.day >> deadline.month >> deadline.year;
+        getline(ss, status);
+
+        // If the charity name matches, skip this line
+        if (name == charityName) {
+            found = true;  // Charity found, so we don't write this line
+            continue;
+        }
+
+        // If no match, copy the line to the temp file
+        tempFile << line << endl;
+    }
+
+    infile.close();
+    tempFile.close();
+
+    // If charity was found and removed, replace the original file with the new one
+    if (found) {
+        remove(file.c_str());  // Delete the original file
+        rename("temp.txt", file.c_str());  // Rename the temporary file to the original file name
+        cout << "Charity " << charityName << " has been removed." << endl;
+    }
+    else {
+        remove("temp.txt");  // Delete the temporary file if no match was found
+        cout << "Charity " << charityName << " not found." << endl;
+    }
+}
+
+void charityNames(const string& file) {
+    ifstream infile(file);
+    string line;
+
+    cout << "List of Charity Names:\n";
+
+    while (getline(infile, line)) {
+        stringstream ss(line);
+        int charityID;
+        string name;
+
+        ss >> charityID;
+        ss >> ws;  // Skip whitespace
+        ss >> name;
+
+        cout << "- " << name << endl;
+    }
+
+    infile.close();
+}
+
+void modify_charities(const string& file, const string& targetName) {
+    ifstream infile(file);
+    ofstream tempFile("temp.txt");
+    string line;
+    bool found = false;
+
+    while (getline(infile, line)) {
+        stringstream ss(line);
+        Charity charity;
+
+        // Read current charity record
+        string deadlineStr;
+        ss >> charity.charityID >> ws >> charity.name >> charity.description
+            >> charity.targetAmount >> charity.currentAmount
+            >> deadlineStr >> charity.status;
+
+        // Parse deadline string (format: dd/mm/yyyy)
+        sscanf_s(deadlineStr.c_str(), "%d/%d/%d", &charity.deadline.day, &charity.deadline.month, &charity.deadline.year);
+
+        if (charity.name == targetName) {
+            found = true;
+
+            // Display current values
+            cout << "\nCharity found:\n";
+            cout << "ID: " << charity.charityID << "\n";
+            cout << "Name: " << charity.name << "\n";
+            cout << "Description: " << charity.description << "\n";
+            cout << "Target Amount: " << charity.targetAmount << "\n";
+            cout << "Current Amount: " << charity.currentAmount << "\n";
+            cout << "Deadline: " << charity.deadline.day << "/" << charity.deadline.month << "/" << charity.deadline.year << "\n";
+            cout << "Status: " << charity.status << "\n\n";
+
+            // Prompt user for new values
+            cout << "Enter new name: ";
+            cin >> charity.name;
+            cout << "Enter new description: ";
+            cin >> charity.description;
+            cout << "Enter new target amount: ";
+            cin >> charity.targetAmount;
+            cout << "Enter new current amount: ";
+            cin >> charity.currentAmount;
+            cout << "Enter new deadline (day month year): ";
+            cin >> charity.deadline.day >> charity.deadline.month >> charity.deadline.year;
+            cout << "Enter new status: ";
+            cin >> charity.status;
+
+            // Write updated charity
+            tempFile << charity.charityID << "    "
+                << charity.name << "   "
+                << charity.description << "    "
+                << charity.targetAmount << "     "
+                << charity.currentAmount << "     "
+                << charity.deadline.day << "/" << charity.deadline.month << "/" << charity.deadline.year << "     "
+                << charity.status << endl;
+        }
+        else {
+            // Copy original line if not matching
+            tempFile << line << endl;
+        }
+    }
+
+    infile.close();
+    tempFile.close();
+
+    if (found) {
+        remove(file.c_str());
+        rename("temp.txt", file.c_str());
+        cout << "Charity modified successfully.\n";
+    }
+    else {
+        remove("temp.txt");
+        cout << "Charity with name \"" << targetName << "\" not found.\n";
+    }
 }
 
 
@@ -260,14 +447,24 @@ int main()
 
             cin >> admin_input;
             if (admin_input == "A") {
-
                 AddCharity();
             }
             else if (admin_input == "B") {
-                //
+                cout << "charities available to be removed: " << endl;
+                charityNames("charities.txt");
+                string charity_name;
+                cout << "Enter the name of the charity you want to remove: ";
+                cin >> charity_name;
+                removeCharityByName("charities.txt", charity_name);
             }
             else if (admin_input == "C") {
-                //
+                cout << "charities available to be modified: " << endl;
+                charityNames("charities.txt");
+                string charity_name;
+                cout << "Enter the name of the charity you want to modify: ";
+                cin >> charity_name;
+
+                modify_charities("charities.txt", charity_name);
             }
             else {
                 cout << "please enter a valid answer as admin: ";
