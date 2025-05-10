@@ -136,6 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="charities.txt" />
+    <Text Include="donations.txt" />
     <Text Include="user.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

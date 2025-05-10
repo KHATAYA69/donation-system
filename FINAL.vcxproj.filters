@@ -22,5 +22,6 @@
   <ItemGroup>
     <Text Include="user.txt" />
     <Text Include="charities.txt" />
+    <Text Include="donations.txt" />
   </ItemGroup>
 </Project>

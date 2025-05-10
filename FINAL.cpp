@@ -18,7 +18,7 @@ struct User {
     string username;
     string pass; 
     string email;
-    int ID =0;
+    int ID = 0;
     string phonenumber;
 };
 
@@ -36,6 +36,21 @@ struct Charity {
     double currentAmount;
     Date deadline;
     string status;
+};
+
+struct Donations {
+    int DonationdID;
+    int CharityId;
+    float amount;
+    string message;
+    Date Donation_date;
+    string donationTime;
+
+};
+
+struct Client {
+    Donations donation;
+    User user;
 };
 
 void write_file_user(const string file, User user) {
@@ -96,8 +111,6 @@ bool charityExists(const string& file, const string& charityName) {
     return false;  // Charity doesn't exist
 }
 
-
-
 void write_file_charity(const string file, Charity charity) {
     fstream myfile(file, ios::in | ios::out | ios::app);
     int lastID = 0;
@@ -130,7 +143,6 @@ void write_file_charity(const string file, Charity charity) {
     infile.close();
 }
 
-
 bool isValidPassword(const string& password) {
     if (password.length() < 8)
         return false;
@@ -155,7 +167,6 @@ bool isValidPhoneNum(const string phone_number)
         return false;
     }
 }
-
 
 string sha1Hash(const string& input) {
     SHA1 sha1;
@@ -201,42 +212,46 @@ void SignUp() {
     write_file_user("user.txt", user);
 }
 
-void SignIn() {
+User SignIn() {
+    bool success = false;
     User user;
-    cout << "enter your username: ";
-    cin >> user.username;
 
-    cout << "enter password: ";
-    cin >> user.pass;
-    string hashedPassword = sha1Hash(user.pass);
+    while (!success) {
+        cout << "Enter your username: ";
+        cin >> user.username;
+
+        cout << "Enter password: ";
+        cin >> user.pass;
+        string hashedPassword = sha1Hash(user.pass);
 
         ifstream infile("user.txt");
-    string line;
+        string line;
+        success = false; 
 
-    bool success = false;
-    while (getline(infile, line)) {
-        stringstream ss(line);
-        string id, email, username, password, phonenumber;
+        while (getline(infile, line)) {
+            stringstream ss(line);
+            int id;
+            string email, username, password, phonenumber;
 
-        ss >> id >> email >> username >> password >> phonenumber;
+            ss >> id >> email >> username >> password >> phonenumber;
 
-        if (username == user.username && password == hashedPassword) {
-            success = true;
-            break;
+            if (username == user.username && password == hashedPassword) {
+                user.ID = int(id);
+                success = true;
+                break;
+            }
+        }
+
+        infile.close();
+
+        if (!success) {
+            cout << "Invalid username or password. Please try again.\n";
         }
     }
 
-    infile.close();
-    if (success) {
-        cout << "Login successful.\n";
-    }
-    else {
-        cout << "Invalid username or password.\n";
-    }
-
+    cout << "Login successful.\n";
+    return user;
 }
-
-
 
 void AddCharity() {
     Charity charity;
@@ -419,18 +434,220 @@ void modify_charities(const string& file, const string& targetName) {
     }
 }
 
+int get_charity_id_by_name(const string& filename, const string& targetName) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error: Could not open file " << filename << endl;
+        return -1;
+    }
+
+    string line;
+    while (getline(file, line)) {
+        stringstream ss(line);
+        int id;
+        string name, desc, status;
+        double target, current;
+        string date;
+
+        ss >> id >> name >> desc >> target >> current >> date >> status;
+
+        if (name == targetName) {
+            return id;
+        }
+    }
+
+    return -1; // Not found
+}
+
+void Write_to_Donation_file(const string file, Client client, int CharityID) {
+    fstream myfile(file, ios::in | ios::out | ios::app);
+    
+    //Donation ID
+    int lastID = 0;
+    ifstream infile(file);
+    string line, lastLine;
+
+    while (getline(infile, line)) {
+        if (!line.empty()) {
+            lastLine = line;
+        }
+    }
+
+    if (!lastLine.empty()) {
+        stringstream ss(lastLine);
+        ss >> lastID;
+    }
+    client.donation.DonationdID = lastID + 1;
+
+    //Charity ID
+
+    myfile << client.donation.DonationdID << "    "
+        << CharityID << "   "
+        << client.donation.amount << "    "
+        << client.donation.Donation_date.day << "/" << client.donation.Donation_date.month << "/" << client.donation.Donation_date.year << "     "
+        << client.donation.donationTime << "     "
+        << client.user.ID << endl;
+
+    myfile.close();
+    infile.close();
+
+
+
+}
+
+void AddDonation() {
+    Client client;
+    string charity_name;
+    User user = SignIn();
+
+    charityNames("charities.txt");
+    cout << "Which charity would you like to donate to?(enter charity name:): ";
+    cin >> charity_name;
+
+    while (!charityExists("charities.txt", charity_name)) {
+        cout << "This charity does not exists in the file enter a valid name!" << endl;
+        cin >> charity_name;
+    }
+
+    int CharityID = get_charity_id_by_name("charities.txt", charity_name);
+
+    client.user = user;
+
+    cout << "Enter donation amount: ";
+    cin >> client.donation.amount;
+
+    cout << "Enter a message (optional): ";
+
+    cin.ignore();
+    getline(cin, client.donation.message);
+
+    cout << "Enter date of donation: ";
+    cin >> client.donation.Donation_date.day >> client.donation.Donation_date.month >> client.donation.Donation_date.year;
+
+    cout << "Enter duration time: ";
+    cin >> client.donation.donationTime;
+
+    Write_to_Donation_file("donations.txt", client, CharityID);
+}
+
+void show_donated_info(const string& filename, int user_id) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error: Could not open file " << filename << endl;
+        return;
+    }
+
+    string line;
+    bool found = false;
+
+    cout << "\nDonations made by user ID: " << user_id << endl;
+    cout << "------------------------------------------\n";
+    while (getline(file, line)) {
+        stringstream ss(line);
+        int donationID, charityID, file_userID;
+        double amount;
+        string date, time;
+
+        ss >> donationID >> charityID >> amount >> date >> time >> file_userID;
+
+        if (file_userID == user_id) {
+            found = true;
+            cout << "Donation ID: " << donationID << "\n";
+            cout << "Charity ID: " << charityID << "\n";
+            cout << "Amount: " << amount << "\n";
+            cout << "Date: " << date << "\n";
+            cout << "Time: " << time << "\n";
+            cout << "-----------------------------\n";
+        }
+    }
+
+    if (!found) {
+        cout << "No donations found for user ID " << user_id << ".\n";
+    }
+
+    file.close();
+}
+
+
+void delete_donation() {
+    User user = SignIn();
+    show_donated_info("donations.txt", user.ID);
+
+    int targetDonationID;
+    cout << "\nEnter the Donation ID you want to delete: ";
+    cin >> targetDonationID;
+
+    ifstream infile("donations.txt");
+    ofstream temp("temp.txt");
+    if (!infile.is_open() || !temp.is_open()) {
+        cerr << "Error: Could not open donation files.\n";
+        return;
+    }
+
+    string line;
+    bool deleted = false;
+
+    while (getline(infile, line)) {
+        stringstream ss(line);
+        int donationID, charityID, file_userID;
+        double amount;
+        string date, time;
+
+        ss >> donationID >> charityID >> amount >> date >> time >> file_userID;
+
+        if (donationID == targetDonationID && file_userID == user.ID) {
+            deleted = true;
+            continue;  // Skip writing this line (deletes it)
+        }
+
+        temp << line << endl;  // Write the rest to the temp file
+    }
+
+    infile.close();
+    temp.close();
+
+    // Replace old file with new
+    remove("donations.txt");
+    rename("temp.txt", "donations.txt");
+
+    if (deleted) {
+        cout << "Donation with ID " << targetDonationID << " has been deleted successfully.\n";
+    }
+    else {
+        cout << "No matching donation found for your ID and the given Donation ID.\n";
+    }
+}
+
+
 
 int main()
 {
     string Account_answer;
+    string charity_name;
 
     //Ask user about account existence
     while (true) {
-        cout << "Do you have an account or an admin?(Y/N/A)" << endl;
+        cout << "Do you have an account or an admin account?(Y/N/A)" << endl;
         cin >> Account_answer;
 
         if (Account_answer == "Y"){
-            SignIn();
+            string user_input;
+            cout << "options to do as user: " << endl;
+            cout << "A: add donation." << endl;
+            cout << "B: Remove donation." << endl;
+            cout << "C: exit" << endl;
+
+            cin >> user_input;
+            if (user_input == "A") {
+                AddDonation();
+            }
+
+            else if (user_input == "B") {
+                delete_donation();
+            }
+            else if (user_input == "C") {
+                return 0;
+            }
             break;
         }
         else if (Account_answer == "N") {
